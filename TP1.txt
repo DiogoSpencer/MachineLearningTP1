@@ -1,0 +1,125 @@
+AtenÃ§Ã£o:
+- NÃ£o edite este ficheiro em programas como Word e afins. Use exclusivamente um editor de texto simples. Em caso de dÃºvida, use o editor do Spyder.
+- NÃ£o altere a estrutura deste ficheiro. Preencha as respostas apenas nos espaÃ§os respectivos (a seguir Ã  tag R#:)
+- Pode adicionar linhas no espaÃ§o para as respostas mas as respostas devem ser sucintas e directas.
+QUESTÃ”ES:
+
+Q1: Considerando os dados fornecidos, explique a necessidade de standardizar os valores dos atributos.
+R1: As features não tem o mesmo intervalo de valor entre elas, logo precisamos de standardizar os dados de maneira a criar uma escala comum para todas as features.
+
+
+
+Q2: Explique como calculou os parÃ¢metros para standardizaÃ§Ã£o e como os usou no conjunto de teste.
+R2: Para determinarmos os parâmetros para a standardização calculámos o desvio padrão e a média de cada feature. Depois, ao valor real da feature foi subtraído o valor da média da amostra e o resultado
+ foi dividido pelo desvio padrão. Cada ponto do training set e do test set foi sujeito a esta operação.
+
+
+Q3: Explique como calculou a probabilidade a priori de um exemplo pertencer a uma classe (a probabilidade antes de ter em conta os valores dos atributos do exemplo) na sua implementaÃ§Ã£o do classificador NaÃ¯ve Bayes. Pode incluir um trecho relevante do cÃ³digo se ajudar a explicar.
+R3: A probabilidade a priori consiste na probabilidade de pertencer a uma classe onde o Ys == 0 ou a uma classe onde o Ys==1 ou seja, é o número de amostras pertencentes a uma classe
+    a dividir pelo número total de amostras.
+
+    
+    training = [Xs[Ys == 0],
+                Xs[Ys == 1]]
+
+    logAPrioProb = [np.log(training[0].shape[0] / Ys.shape[0]),
+                    np.log(training[1].shape[0] / Ys.shape[0])]
+    
+
+Q4: Explique como o seu classificador NaÃ¯ve Bayes prevÃª a classe a que um exemplo de teste pertence. Pode incluir um trecho relevante do cÃ³digo se ajudar a explicar.
+R4: Sendo que neste classificador Naive Bayes assume-se que as features são independentes, o classificador prevê a classe a que um exemplo de teste pertence computando o somatório da probabilidade 
+de cada feature dada uma classe, e a este valor soma-se a probabilidade de pertencer à classe. O processo é repetido em todas as classes e é escolhida a classe que contenha o maior valor. A probabilidade 
+de cada feature dada uma classe é optida através de uma função de kernel density treinada anteriormente.
+    Fase de treino :
+        for xs in training:
+                for i in range(Xs.shape[1]):
+                        classifiers.append(KernelDensity(bandwidth=bw,kernel='gaussian').fit(xs[:,i].reshape(-1,1)))
+
+    Fase de score:
+        def NBwithKDE_score(classifiers, logAPrioProb, Xs, Ys,):
+                number_of_features = Xs.shape[1]
+                number_of_points = Xs.shape[0]
+                resC0 = np.ones((number_of_points, number_of_features))
+                resC1 = np.ones((number_of_points, number_of_features))
+                feature_idx = 0
+                for clf in classifiers:
+                if(feature_idx < number_of_features):
+                        resC0[:,feature_idx] = clf.score_samples(Xs[:,feature_idx].reshape(-1,1)) 
+                else:
+                        resC1[:,feature_idx-number_of_features] = clf.score_samples(Xs[:,feature_idx-number_of_features].reshape(-1,1)) 
+                feature_idx = feature_idx + 1
+                # SOMAR A PROBABILIDADE DE CADA FEATURE PARA CADA CLASSE COM A PROBABILIDADE APRIO E ESCOLHER O VALOR MAXIMO
+                resultC0 = np.sum(resC0, axis=1) + logAPrioProb[0]
+                resultC1 = np.sum(resC1, axis=1) + logAPrioProb[1]
+                result = np.maximum(resultC0, resultC1)
+                result = result - resultC0
+                result[result != 0] = 1
+
+
+Q5: Explique que efeito tem o parÃ¢metro de bandwidth no seu classificador.
+R5: A bandwith controla a vizinhanca, quanto maior a bandwith maior vai ser o peso dos pontos que estão afastados do valor de treino(vizinhança), e quanto menor for a bandwith mais restringida vai estar a vizinhança.
+
+
+
+
+
+Q6: Explique que efeito tem o parÃ¢metro gamma no classificador SVM.
+R6: O gamma controla o peso dos pontos que estão mais perto ou mais longe da fronteira, ou seja, valores altos de gamma dão
+    peso aos pontos mais perto da fronteira, valores baixos de gamma dão peso aos pontos longe da fronteira.
+
+
+Q7: Explique como determinou o melhor parÃ¢metro de bandwidth e gamma para o seu classificador e o classificador SVM. Pode incluir um trecho relevante do cÃ³digo se ajudar a explicar.
+R7: Determinámos o valor óptimo para o parâmetro gamma e bandwidth através da realização de ciclos a percorrer um range de valores que varia entre 0.2 e 6.0, que eram atribuídos aos parâmetros, e enquanto isso 
+íamos executando cross validation sobre o training set, com 5 folds, realizando o fit múltiplas vezes e comparando os scores que iam sendo obtidos, guardando o score óptimo e os parâmetros ideais. Quando chegámos
+ao fim da execução do ciclo pudemos então recolher os valores óptimos para os parâmetros.
+
+Exemplo com o parâmetro bandwidth: 
+
+for b in np.arange(0.02, 0.62, 0.02):
+        curr_accuracy = 0
+        kf = StratifiedKFold(n_splits = NUM_OF_FOLDS)
+        for train_ix,valid_ix in kf.split(Ys_tr, Ys_tr):
+            classifiers, logAPrioProb = KDEfit(Xs_tr[train_ix], Ys_tr[train_ix], b)
+            curr_accuracy += NBwithKDE_score(classifiers, logAPrioProb, Xs_tr[valid_ix], Ys_tr[valid_ix])[0]
+        curr_accuracy = curr_accuracy / NUM_OF_FOLDS
+        errors["training"]["NB"].append(1 - NBwithKDE_score(classifiers, logAPrioProb, Xs_tr, Ys_tr)[0])
+        errors["validation"]["NB"].append(1-curr_accuracy)
+        # ARRANAJR O MELHOR VALOR DA BANDWITH 
+        if(optimal_parameters["accuracy"] < curr_accuracy):
+           optimal_parameters["accuracy"] = curr_accuracy
+           optimal_parameters["bandwidth"] = b
+
+Q8: Explique como obteve a melhor hipÃ³tese para cada um dos classificadores depois de optimizados os parÃ¢metros.
+R8: Obtivemos a melhor hipotese realizando novamente o fit do classificador, em todo o training set, utilizando os parâmetros optimizados.
+
+Q9: Mostre os melhores valores dos parÃ¢metros optimizados, a estimativa do erro verdadeiro de cada uma das hipÃ³teses que obteve (o seu classificador e os dois fornecidos pela biblioteca), os intervalos do nÃºmero esperado de erros dados pelo teste normal aproximado e os valores dos testes de McNemar e discuta o que pode concluir daÃ­.
+R9: MY NB:  Best bandwidth =   0.1,
+            Error in test set = 0.10665597433841223,
+            Approximate normal test : X = 133.00000000000006 +- 21.364427546614653
+    SVM:
+            Best gamma =  0.1,
+            Error in test set = 0.0737770649558942 , 
+            Approximate normal test: X = 92.00000000000007 +- 18.09288198459329  
+    SKL NB:
+            Error in test set = 0.14915797914995987,
+            Approximate normal test: X = 185.99999999999997 +- 24.656816817207723  
+    McNemar test: 
+        Svm VS own Naive Bayes =  22.535211267605632 
+        Svm vs Scikit learn Naive Bayes =  70.89344262295081 
+        Own Naive Bayes Vs Scikit learn Naive Bayes =  31.811764705882354
+    
+    Os testes aproximados pela normal ditam que caso os intervalos de confiança se interceptem então existe a possibilidade de terem o mesmo true error.
+    No nosso caso observamos que o nosso Naive Bayes intercepta com o seu limite inferior o limite superior do SVM, portanto podemos conluir que existe
+    a possibilidade de terem o mesmo true error.
+    No McNemar test, conseguimos ver quais os classificadores que obtem resultados mais diferentes entre eles, isto serve para nos dizer
+    se os classificadores tiveram a mesma performance na classificação dos dados. Podemos observar que no SVM vs SKL NB foi onde
+    existiu uma maior diferença de classificações, ou seja os classificadores tiveram uma performance distinta, enquanto que o resultado mais baixo
+    foi no SVM vs Own NB, ou seja existiu semelhança na classificação.
+    Observamos que SVM obtem melhores resultados do que o Naive Bayes com tunning dos parâmetros.
+    Para concluir, olhando para os dados obtidos de todos os testes, é possível dizer que os classificadores que tiveram tunning
+    dos parâmetros foram os que obteram melhores resultados, ou seja o tunning dos parâmetros é bastante importante
+    para ter um bom classificador.
+
+
+Q10: (Opcional) Mostre a estimativa do erro verdadeiro do classificador SVM optimizado (se fez a parte opcional do trabalho) e discuta se valeu a pena fazer essa optimizaÃ§Ã£o. Se nÃ£o fez a parte opcional do trabalho deixe esta resposta em branco.
+R10: 
